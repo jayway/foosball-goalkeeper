@@ -4,6 +4,7 @@
 #define PIN_STATUS D2     // Status led on PCB
 #define IR_LED D3         // IR led
 #define PIN_DETECT1 D4    // Infrared receiver ( IR photo module TSOP1738, TSOP34838)
+#define PIN_FEEDBACK_LED D1 // Green led to indicate goal is detected
 
 // I should learn how to use environment variables for this stuff, but
 // for now, you need to replace the ssid and password manually.
@@ -27,7 +28,18 @@ const char* team = "blue";
 // is as a goal. This is to avoid goals being reported for flake variations.
 const int minActiveTime = 2;
 
+void blinkFeedback(int count) {
+  for (int i = 0; i < count; i++)
+  {
+    digitalWrite(PIN_FEEDBACK_LED, HIGH);
+    delay(100);
+    digitalWrite(PIN_FEEDBACK_LED, LOW);
+    delay(100);
+  }
+}
+
 void notifyGoal() {
+  digitalWrite(PIN_FEEDBACK_LED, HIGH);
   WiFiClient client;
   Serial.println("Registering goal");
   Serial.printf("\n[Connecting to %s ... ", host);
@@ -59,7 +71,11 @@ void notifyGoal() {
     Serial.println("connection failed!]");
     client.stop();
   }
-  delay(2000);
+
+  digitalWrite(PIN_FEEDBACK_LED, LOW);
+  delay(100);
+  blinkFeedback(3);
+
 }
 
 void setup() {
@@ -84,7 +100,8 @@ void setup() {
   //pinMode(IR_LED,  OUTPUT);
   pinMode(PIN_STATUS, OUTPUT);
   pinMode(PIN_DETECT1, INPUT);
-
+  pinMode(PIN_FEEDBACK_LED, OUTPUT);
+  digitalWrite(PIN_FEEDBACK_LED, LOW);
   tone(IR_LED, 38000U);
   Serial.print("Setup done");
 }
