@@ -10,16 +10,13 @@
 const char *ssid = "<WIFI SSID>";         // The SSID (name) of the Wi-Fi network you want to connect to
 const char *password = "<WIFI PASSWORD>"; // The password of the Wi-Fi network
 String team = "blue";                     // Change this to either red or blue depending on deployment target
+const float ballSize = 35.0;  // Millimeters
 
 const char *host = "api.foosball.link";
 const char *fingerprint = "90 3C A1 1A 37 EA 31 C0 B1 8D BC 8E 1B 0D 60 12 43 C2 81 42";
 
 //Create a new Reporter
 Reporter reporter(host, "/", fingerprint);
-
-// Minimum time in ms that the IR needs to be broken for the code to report
-// is as a goal. This is to avoid goals being reported for flake variations.
-const int minActiveTime = 2;
 
 void blinkFeedback(int count)
 {
@@ -32,13 +29,10 @@ void blinkFeedback(int count)
   }
 }
 
-void notifyGoal()
+void notifyGoal(float speed)
 {
-  digitalWrite(PIN_FEEDBACK_LED, HIGH);
-  Serial.println("Registering goal");
-  String postData = "{\"query\":\"mutation registerGoal($team: TeamColor!) {registerGoal(team: $team)}\",\"variables\":{\"team\":\"" + team + "\"}}";
+  String postData = "{\"query\":\"mutation registerGoal($team: TeamColor!) {registerGoal(team: $team, speed: $speed)}\",\"variables\":{\"team\":\"" + team + "\", speed: " + speed + "}}";
   reporter.postMessageToServer(postData);
-  digitalWrite(PIN_FEEDBACK_LED, LOW);
   delay(100);
   blinkFeedback(3);
 }
@@ -76,31 +70,27 @@ void setup()
 }
 
 unsigned long highStart = 0;
-bool hasNotified = true;
+bool prevStateHigh = false;
 
 void loop()
 {
-  if (digitalRead(PIN_DETECT1) == HIGH)
-  {
-    if (highStart && !hasNotified)
-    {
+  if (digitalRead(PIN_DETECT1) == HIGH) {
+    if (prevStateHigh == false){ // begin detecting ball
+      highStart = millis();
+      digitalWrite(PIN_STATUS, LOW);
+    }
+    prevStateHigh = true;
+  }
+  else {
+    if (prevStateHigh) { // end of detection, notify goal and ball speed
+      digitalWrite(PIN_STATUS, HIGH);
       unsigned long delta = millis() - highStart;
-      if (delta > minActiveTime)
-      {
-        hasNotified = true;
-        notifyGoal();
+      if (delta >= 1) {
+        float speed = (float)  (ballSize / (float) delta); // m/s
+        notifyGoal(speed * 3.6); // kilometers per hour
       }
     }
-    else
-    {
-      highStart = millis();
-    }
-    digitalWrite(PIN_STATUS, LOW);
-  }
-  else
-  {
-    digitalWrite(PIN_STATUS, HIGH);
+    prevStateHigh = false;
     highStart = 0;
-    hasNotified = false;
   }
 }
